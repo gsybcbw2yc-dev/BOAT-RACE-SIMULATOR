@@ -46,6 +46,25 @@ assert.throws(()=>c.mergeTickets(prior,[{type:'trifecta',key:'1-1-3',amount:100}
 assert.throws(()=>c.mergeTickets(prior,[{type:'trifecta',key:'1-2-3',amount:150}],1000));
 assert.equal(c.validBetAmount(100),true);assert.equal(c.validBetAmount(0),false);
 console.log('PASS: all seven wager types, formation/box/flow/odds selection, duplicate merge, valid stake and wallet limits.');
+// Animation timing is a visual-only schematic, aligned with one physical finish line.
+for(let lap=0;lap<=3;lap++)for(let radius of [73.5,91,108.5]){
+  const p=c.replayPoint(lap,radius);assert.ok(Math.abs(p.x-360)<1e-8);assert.equal(p.y,160+radius);
+}
+const replay={finish:[4,1,2,6,3,5],firstMark:[1,4,3,2,5,6],actualST:all.map(lane=>({lane,st:.1+lane*.01}))};
+assert.equal(c.replayState(replay,-.15).lap,0);
+assert.equal(c.replayState(replay,.1).lap,1);
+assert.equal(c.replayState(replay,1).lap,2);
+assert.equal(c.replayState(replay,2).lap,3);
+assert.equal(c.replayState(replay,3).finished,false);
+assert.equal(c.replayState(replay,3.2).finished,true);
+let previous=new Map();
+for(let i=0;i<352;i++){
+  const v=c.replayState(replay,-.15+i*.01);
+  for(const b of v.order){assert.ok(Number.isFinite(b.progress));assert.ok(b.progress>=(previous.get(b.lane)??-Infinity)-1e-9);previous.set(b.lane,b.progress);}
+}
+assert.deepEqual(Array.from(c.replayState(replay,3.36).order,b=>b.lane),replay.finish);
+assert.equal(c.replayState({...replay,firstMark:null},3.36).finished,true);
+console.log('PASS: exact start/goal alignment, monotonic boat progress, three laps and individual finish order.');
 const packPath=path.join(__dirname,'private-race-pack.json');
 const pack=fs.existsSync(packPath)?c.validatePack(JSON.parse(fs.readFileSync(packPath,'utf8'))):null;
 const profiles=pack?.profiles||Array.from({length:24},(_,i)=>({name:`Test ${i}`,win:4+i%5*.5,averageST:.15,grade:'A2',flyingCount:0}));
