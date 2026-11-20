@@ -1,0 +1,5 @@
+private-race-pack.json
+boat-simulator-save.json
+boat-research.*
+.openai/
+dist/
