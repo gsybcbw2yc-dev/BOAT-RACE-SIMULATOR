@@ -13,6 +13,7 @@
 <h1>戦略AIの自動学習</h1>
 <p class="sub">描画なし・仮想資金のみ。Q学習で行動の選択を学び、学習に含めない架空レースで固定戦略と比較します。</p>
 <div class="notice">実在の予測精度・利益を示すものではありません。通常のゲームのセーブやBOAT ANALYZER本番には接続しません。</div>
+<section class="panel"><h2>実データ研究（PC・非公開）</h2><p class="sub">非公開の研究環境で実レースのデータ照合・3モデル比較・学習・前向き評価を行います。出力されたJSONを読み込んで確認できます。</p><a class="button" href="real-research.html">実データ研究レポート</a></section>
 <section class="panel">
 <h2>実験設定</h2>
 <div class="grid"><label>学習レース数<select id="train"><option value="1000">1,000（試運転）</option><option value="10000" selected>10,000</option><option value="100000">100,000</option><option value="1000000">1,000,000（PC長時間）</option></select></label><label>評価レース数<select id="evaluate"><option value="500">500</option><option value="2000" selected>2,000</option><option value="10000">10,000</option><option value="100000">100,000</option></select></label><label>再現用シード<input id="seed" value="20261121" maxlength="80"></label></div>

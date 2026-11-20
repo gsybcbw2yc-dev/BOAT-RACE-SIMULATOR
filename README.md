@@ -1,4 +1,4 @@
-# BOAT RACE SIMULATOR v0.4.0
+# BOAT RACE SIMULATOR v0.5.0
 
 仮想資金だけで競艇の予想・資金管理を楽しむ、ビルド不要のブラウザゲーム。
 
@@ -56,4 +56,8 @@ node lab.cjs --train 100000 --evaluate 10000 --seed 20261121 --out boat-q-report
 
 ## 公開対象
 
-`index.html`、`core.js`、`research.html`、`lab.js`、`lab-worker.js`、`lab.cjs`、`README.md`、`test.cjs`、`.gitignore`、`.nojekyll` のみ。`private-race-pack.json`、セーブデータ、研究ログ、学習結果、プレビュー用設定は公開しない。
+`index.html`、`core.js`、`research.html`、`real-research.html`、`lab.js`、`lab-worker.js`、`lab.cjs`、`README.md`、`test.cjs`、`.gitignore`、`.nojekyll` のみ。`private-race-pack.json`、セーブデータ、研究ログ、学習結果、プレビュー用設定は公開しない。
+
+### 実データ研究レポート（v0.5.0）
+
+`real-research.html` は独立した非公開研究環境が出力する `boat-real-lab-report-v1` / `boat-real-lab-forward-v1` のJSONを端末内で表示する読み取り専用ビューア。3モデルの比較、仮想戦略指標、データ蓄積、前向き審査条件を表示する。ブラウザはファイルを送信せず、実レース・本番モデル・モデル重みは公開リポジトリに含めない。
