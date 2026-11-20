@@ -8,6 +8,44 @@ vm.runInNewContext(html.split('<script>')[1].split('</script>')[0],ctx);
 const c=ctx.module.exports;
 const plain=x=>JSON.parse(JSON.stringify(x));
 assert.deepEqual(Object.values(c.COMBOS).map(a=>a.length),[120,20,30,15,15,6,6]);
+// Public BOAT RACE manual: formation/box combinations must be unique and valid.
+const all=[1,2,3,4,5,6],take=(type,method,groups,keys)=>Array.from(c.expandBets(type,method,groups,keys));
+assert.deepEqual(take('trifecta','formation',[[1],[2,3],[2,3,4]]),['1-2-3','1-2-4','1-3-2','1-3-4']);
+assert.equal(take('trifecta','formation',[[1],[2,3],all]).length,8);
+assert.equal(take('trifecta','box',[[1,2,3]]).length,6);
+assert.equal(take('trifecta','box',[[1,2,3,4]]).length,24);
+assert.equal(take('trifecta','box',[all]).length,120);
+assert.equal(take('trio','box',[[1,2,3]]).length,1);
+assert.equal(take('trio','formation',[all,all,all]).length,20);
+assert.equal(take('trio','formation',[[1,2],[1,2],[3]]).length,1);
+assert.equal(take('trifecta','flow',[[1],all,all]).length,20);
+assert.equal(take('trifecta','flow',[all,[2],all]).length,20);
+assert.equal(take('trifecta','flow',[[1],[2],all]).length,4);
+assert.equal(take('trifecta','flow',[[1],[1],all]).length,0);
+assert.equal(take('trio','flow',[[1],all,all]).length,10);
+assert.equal(take('trio','flow',[[1],[2],all]).length,4);
+for(const type of ['exacta','quinella','quinella_place']){
+  assert.equal(take(type,'flow',[[1],all]).length,5);
+  assert.equal(take(type,'box',[all]).length,c.COMBOS[type].length);
+}
+for(const type of Object.keys(c.TYPES)){
+  assert.deepEqual(take(type,'formation',Array.from({length:c.TYPES[type][1]},()=>all)),Array.from(c.COMBOS[type]));
+  assert.equal(take(type,'normal',Array.from({length:c.TYPES[type][1]},(_,i)=>[i+1])).length,1);
+}
+assert.deepEqual(take('trifecta','normal',[[1],[1],[2]]),[]);
+assert.deepEqual(take('trifecta','flow',[all,all,all]),[]);
+assert.deepEqual(take('win','normal',[[6]]),['6']);
+assert.deepEqual(take('place','box',[all]),[]);
+assert.deepEqual(take('trifecta','odds',[],['1-2-3','1-2-3','1-1-3','1-2-4']),['1-2-3','1-2-4']);
+const prior=[{type:'trifecta',key:'1-2-3',amount:100}];
+const merged=c.mergeTickets(prior,[{type:'trifecta',key:'1-2-3',amount:200},{type:'trio',key:'1-2-3',amount:300}],600);
+assert.deepEqual(plain(merged),[{type:'trifecta',key:'1-2-3',amount:300},{type:'trio',key:'1-2-3',amount:300}]);
+assert.equal(prior[0].amount,100);
+assert.throws(()=>c.mergeTickets(prior,[{type:'trifecta',key:'1-2-3',amount:200}],200));
+assert.throws(()=>c.mergeTickets(prior,[{type:'trifecta',key:'1-1-3',amount:100}],1000));
+assert.throws(()=>c.mergeTickets(prior,[{type:'trifecta',key:'1-2-3',amount:150}],1000));
+assert.equal(c.validBetAmount(100),true);assert.equal(c.validBetAmount(0),false);
+console.log('PASS: all seven wager types, formation/box/flow/odds selection, duplicate merge, valid stake and wallet limits.');
 const packPath=path.join(__dirname,'private-race-pack.json');
 const pack=fs.existsSync(packPath)?c.validatePack(JSON.parse(fs.readFileSync(packPath,'utf8'))):null;
 const profiles=pack?.profiles||Array.from({length:24},(_,i)=>({name:`Test ${i}`,win:4+i%5*.5,averageST:.15,grade:'A2',flyingCount:0}));
