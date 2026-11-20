@@ -68,12 +68,43 @@ console.log('PASS: exact start/goal alignment, monotonic boat progress, three la
 const packPath=path.join(__dirname,'private-race-pack.json');
 const pack=fs.existsSync(packPath)?c.validatePack(JSON.parse(fs.readFileSync(packPath,'utf8'))):null;
 const profiles=pack?.profiles||Array.from({length:24},(_,i)=>({name:`Test ${i}`,win:4+i%5*.5,averageST:.15,grade:'A2',flyingCount:0}));
-let total=0;
+let total=0,passes=0,winningLanes=new Set,techniques=new Set;
 for(let i=0;i<500;i++){
   const r=c.generateRace('test',1+i%20,1+i%24,1+i%12,600,profiles,pack?.venueProfiles?.[1+i%24]);
   assert.equal(new Set(r.boats.map(b=>b.name)).size,6);
   const result=c.outcome(r),dist=c.experimental(r).distribution;
   assert.equal(new Set(result.finish).size,6);
+  assert.equal(result.engineVersion,c.ENGINE);
+  assert.equal(result.timeline.length,6);
+  assert.equal(result.splits.length,6);
+  const byCrossing=i=>Array.from([...result.timeline].sort((a,b)=>a.points[i].t-b.points[i].t),b=>b.lane);
+  assert.deepEqual(byCrossing(3),Array.from(result.firstMark));
+  assert.deepEqual(byCrossing(24),Array.from(result.finish));
+  assert.ok(result.actualST.every(a=>a.st>=0&&a.st<1));
+  winningLanes.add(result.finish[0]);techniques.add(result.technique);
+  if(result.firstMark[0]!==result.finish[0])passes++;
+  const end=c.timelineEnd(result.timeline);
+  assert.equal(c.timelineState(result.timeline,-18).lap,0);
+  assert.equal(c.timelineState(result.timeline,1).lap,1);
+  assert.equal(c.timelineState(result.timeline,end+4).finished,true);
+  assert.deepEqual(Array.from(c.timelineState(result.timeline,end+4).order,b=>b.lane),Array.from(result.finish));
+  for(const b of result.timeline){
+    assert.equal(b.points.length,25);
+    assert.equal(b.points[0].p,0);
+    assert.equal(b.points.at(-1).p,3);
+    for(let j=1;j<b.points.length;j++){
+      const a=b.points[j-1],z=b.points[j];
+      assert.ok(z.t>a.t&&z.p>a.p);
+      assert.ok(Math.abs(c.pointAt(b,z.t).p-z.p)<1e-8);
+      const q=c.pointAt(b,(a.t+z.t)/2);
+      assert.ok(a.p<=q.p&&q.p<=z.p&&q.speed>=0&&Number.isFinite(q.r));
+      const pose=c.boatPose(b,(a.t+z.t)/2);
+      assert.ok(Number.isFinite(pose.x)&&Number.isFinite(pose.y)&&Number.isFinite(pose.angle));
+    }
+    const pre=c.boatPose(b,-9.00001),post=c.boatPose(b,-9);
+    assert.ok(Math.hypot(pre.x-post.x,pre.y-post.y)<.01);
+    assert.ok(Math.abs(c.boatPose(b,b.st).x-360)<1e-8);
+  }
   assert.equal(dist.length,120);assert.ok(Math.abs(dist.reduce((n,x)=>n+x[1],0)-1)<1e-8);
   assert.ok(c.brier(dist,result.finish)>=0);
   assert.deepEqual(plain(c.outcome(r)),plain(result));
@@ -87,8 +118,16 @@ for(let i=0;i<500;i++){
   }
   assert.equal(c.settle(tickets,pay),tickets.reduce((s,t)=>s+pay[t.type][t.key],0));
 }
+assert.ok(winningLanes.size>=5);assert.ok(techniques.size>=4);assert.ok(passes>0);
+console.log(`PASS: 500 sector timelines, ${passes} races with a different first-turn leader and winner, ${winningLanes.size} winning lanes, ${techniques.size} techniques; continuous progress and correct crossings.`);
 for(const r of pack?.races||[]){
   const result=c.outcome(r),pay=c.payoutMaps(r,result,{});
+  const timeline=c.archiveTimeline(r,result),actual=c.timelineState(timeline,c.timelineEnd(timeline)+4);
+  assert.equal(result.firstMark,null);assert.equal(result.splits,undefined);
+  assert.equal(result.engineVersion,'ARCHIVE');
+  assert.deepEqual(Array.from(actual.order,b=>b.lane),Array.from(r.finish));
+  assert.ok(timeline.every(b=>b.points.every((v,i)=>i===0||v.t>b.points[i-1].t)));
+  assert.deepEqual(plain(result.actualST),plain(r.actualST));
   assert.equal(r.baseline.distribution.length,120);
   for(const type of Object.keys(c.TYPES))assert.deepEqual(Object.keys(pay[type]).sort(),Array.from(c.winners(type,r.finish)).sort());
   assert.ok(Math.abs(c.experimental(r).distribution.reduce((n,x)=>n+x[1],0)-1)<1e-8);
