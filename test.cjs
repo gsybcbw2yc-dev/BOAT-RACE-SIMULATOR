@@ -1,11 +1,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const vm=require('node:vm');
 const path=require('node:path');
-const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
-const ctx={module:{exports:{}}};
-vm.runInNewContext(html.split('<script>')[1].split('</script>')[0],ctx);
-const c=ctx.module.exports;
+const c=require('./core.js');
 const plain=x=>JSON.parse(JSON.stringify(x));
 assert.deepEqual(Object.values(c.COMBOS).map(a=>a.length),[120,20,30,15,15,6,6]);
 // Public BOAT RACE manual: formation/box combinations must be unique and valid.
@@ -138,3 +134,19 @@ c.closeDay(s);assert.equal(s.wallet,108900);assert.equal(s.debt,10100);assert.eq
 assert.equal(c.repay(s),true);assert.equal(c.net(s),98800);
 s.wallet=0;s.debt=10000;for(let i=0;i<6;i++){c.closeDay(s);assert.equal(s.gameOver,false)}c.closeDay(s);assert.equal(s.gameOver,true);
 console.log(`PASS: 500 synthetic races, ${total} winning ticket cases, ${pack?.races.length||0} archived races; 7-day insolvency, loan, interest, repayment, probability normalization and deterministic outcome.`);
+// The game and research share exactly the same 3T market and race engine.
+const lab=require('./lab.js'),cfg={train:1000,evaluate:240,seed:'test-2026'};
+const ids=new Set;
+for(const phase of ['train','eval'])for(let i=0;i<96;i++){const r=lab.card(cfg,phase,i);assert.ok(!ids.has(r.id));ids.add(r.id);assert.deepEqual(c.market3(r,0),c.market(r,0).trifecta)}
+const l1=new lab.Runner(cfg);
+while(l1.phase==='train')l1.step(1);
+const qBefore=JSON.stringify(l1.q);
+while(!l1.done)l1.step(23);
+assert.equal(JSON.stringify(l1.q),qBefore);
+const l2=new lab.Runner(cfg);while(!l2.done)l2.step(311);
+const result=l1.report();assert.deepEqual(plain(l2.report()),plain(result));
+assert.equal(result.training.races,cfg.train);assert.ok(result.states>0);
+for(const m of result.evaluation){assert.equal(m.races,cfg.evaluate);assert.equal(m.pnl,m.returns-m.stake);assert.equal(m.episodes,5);assert.ok(m.participation>=0&&m.participation<=1)}
+const skip=result.evaluation.find(m=>m.id==='skip');assert.equal(skip.pnl,0);assert.equal(skip.roi,null);assert.equal(skip.stake,0);
+assert.throws(()=>new lab.Runner({train:1000001,evaluate:1}));
+console.log('PASS: distinct training/evaluation race IDs, exact game odds, deterministic Q learning across chunk sizes, frozen evaluation, four identical-race comparison policies.');
