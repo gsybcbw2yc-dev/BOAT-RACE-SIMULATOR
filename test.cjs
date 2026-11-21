@@ -150,3 +150,37 @@ for(const m of result.evaluation){assert.equal(m.races,cfg.evaluate);assert.equa
 const skip=result.evaluation.find(m=>m.id==='skip');assert.equal(skip.pnl,0);assert.equal(skip.roi,null);assert.equal(skip.stake,0);
 assert.throws(()=>new lab.Runner({train:1000001,evaluate:1}));
 console.log('PASS: distinct training/evaluation race IDs, exact game odds, deterministic Q learning across chunk sizes, frozen evaluation, four identical-race comparison policies.');
+// Frozen port must fail closed without the private pack; its bytes are not in this repo.
+const bridge=require('./model-bridge.js'),realData=require('./real-data.js');
+assert.throws(()=>new lab.Runner({model:'v4',train:2,evaluate:2}),/モデルパック/);
+assert.throws(()=>bridge.validate({schema:'boat-frozen-model-pack-v1'}));
+const synthetic=bridge.syntheticInput(lab.card(cfg,'train',0));
+assert.equal(synthetic.date,'2026-11-17');assert.equal(new Set(synthetic.boats.map(b=>b.registrationNumber)).size,6);
+assert.ok(synthetic.boats.every(b=>b.registrationNumber>=900000&&b.integratedInput));
+// Fabricated fixture only, NOT a collected race or research result.
+function fixture(date,quality='A',cancel=false){
+ const id=date+'/01/1',hd=date.replaceAll('-',''),official=p=>'https://www.boatrace.jp/owpc/pc/race/'+p+'?hd='+hd+'&jcd=01&rno=1',captured=date+'T02:00:00Z',deadline=Date.parse(date+'T02:05:00Z'),after=new Date(deadline+86400000).toISOString(),pay='https://www.boatrace.jp/owpc/pc/race/pay?hd='+hd;
+ const inputs={...synthetic,qualityTier:quality,programEvidence:{source:official('racelist'),fetchedAt:captured},previewEvidence:{source:official('beforeinfo'),fetchedAt:captured}};
+ return {schema:1,date,tables:{collection_forecasts:[{race_id:id,date,venue:1,race_no:1,model_id:bridge.IDS.v4,inputs_json:JSON.stringify(inputs),deadline_ms:deadline,fetched_at:captured,captured_at:captured}],collection_odds:[{race_id:id,fetched_at:captured,source_url:official('odds3t'),odds_json:JSON.stringify(c.COMBOS.trifecta.map(k=>[k,50]))}],collection_archive_results:[{race_id:id,state:'normal',finish:'1-2-3',payout:5000,fetched_at:after}],collection_official_payouts:[{race_id:id,finish:'1-2-3',payout:5000,source_url:pay,fetched_at:after}],collection_result_corrections:cancel?[{race_id:id,state:'excluded'}]:[]}};
+}
+const batches=[fixture('2026-11-22'),fixture('2026-11-23'),fixture('2026-11-24','C'),fixture('2026-11-25','A',true)],real=realData.prepare(batches);
+assert.equal(real.train.length,1);assert.equal(real.eval.length,1);assert.equal(real.summary.excluded,2);assert.equal(real.summary.trainEnd,'2026-11-22');assert.equal(real.summary.evalStart,'2026-11-23');
+assert.throws(()=>realData.prepare([batches[0],batches[2]]));
+const realRunner=new lab.Runner({train:1,evaluate:1},null,real);while(!realRunner.done)realRunner.step(1);
+assert.equal(realRunner.report().syntheticOnly,false);assert.equal(realRunner.report().evaluation[0].races,1);
+console.log('PASS: real batch validation, quality and special-result exclusions, chronological day separation, official settlement.');
+if(process.env.BOAT_PRIVATE_MODEL_PACK){
+ const p=JSON.parse(fs.readFileSync(process.env.BOAT_PRIVATE_MODEL_PACK,'utf8')),engine=bridge.nodeEngine(p);
+ assert.throws(()=>bridge.nodeEngine({...p,payload:'eA=='}));
+ for(const k of Object.keys(bridge.IDS)){
+  const runner=new lab.Runner({train:12,evaluate:6,model:k,seed:'port-smoke'},engine);
+  const distribution=bridge.predictor(k,engine)(lab.card(cfg,'train',0)).distribution;
+  assert.equal(distribution.length,120);assert.ok(Math.abs(distribution.reduce((a,v)=>a+v[1],0)-1)<1e-10);
+  while(runner.phase==='train')runner.step(1);
+  const q=JSON.stringify(runner.q);while(!runner.done)runner.step(2);assert.equal(JSON.stringify(runner.q),q);
+  assert.equal(runner.report().model,bridge.IDS[k]);assert.equal(runner.report().modelPack.sha256,bridge.SHA);
+ }
+ const invalid={...synthetic,boats:synthetic.boats.map(b=>({...b,integratedInput:false}))};
+ assert.throws(()=>engine.predict('integrated',invalid),/適用不可/);
+ console.log('PASS: exact private pack, all three model IDs and probability normalization, no fallback, independent Q learning and frozen evaluation.');
+}
