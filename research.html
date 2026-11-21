@@ -7,15 +7,18 @@
 </style>
 </head>
 <body>
-<header><div><small>RACING LAB / QLAB-1.0</small>AI研究ラボ</div><a class="button" href="index.html">ゲームへ戻る</a></header>
+<header><div><small>RACING LAB / QLAB-1.1</small>AI研究ラボ</div><a class="button" href="index.html">ゲームへ戻る</a></header>
 <main>
-<span class="tag">PC 推奨 / 架空データ専用</span>
+<span class="tag">PC 推奨 / 架空・実データ研究</span>
 <h1>戦略AIの自動学習</h1>
-<p class="sub">描画なし・仮想資金のみ。Q学習で行動の選択を学び、学習に含めない架空レースで固定戦略と比較します。</p>
-<div class="notice">実在の予測精度・利益を示すものではありません。通常のゲームのセーブやBOAT ANALYZER本番には接続しません。</div>
+<p class="sub">描画なし・仮想資金のみ。固定予測モデルを選び、Q学習で行動の選択を学び、学習に含めないレースで固定戦略と比較します。</p>
+<div class="notice">モデルの重みは更新しません。実レースの過去検証も将来の利益を保証しません。通常のゲームのセーブやBOAT ANALYZER本番には接続しません。</div>
 <section class="panel"><h2>実データ研究（PC・非公開）</h2><p class="sub">非公開の研究環境で実レースのデータ照合・3モデル比較・学習・前向き評価を行います。出力されたJSONを読み込んで確認できます。</p><a class="button" href="real-research.html">実データ研究レポート</a></section>
 <section class="panel">
 <h2>実験設定</h2>
+<div class="grid"><label>固定予測モデル<select id="model"><option value="experimental">独自モデル EXP-PL-0.1</option><option value="v4">V4 基準型</option><option value="scenario">V6 展開型</option><option value="integrated">V6 統合型</option></select></label><label>使用データ<select id="dataset"><option value="synthetic">架空レース</option><option value="real">蓄積実レース（品質A/B）</option></select></label></div>
+<div class="row"><button id="pick-pack">非公開モデルパックを読み込む</button><input type="file" id="model-file" accept=".json,application/json" hidden><a class="button" href="https://github.com/gsybcbw2yc-dev/BOAT-ANALYZER-V6/blob/main/simulator/private-model-pack-v58.json" target="_blank" rel="noopener">モデルパック（本人のみ）</a></div><p class="sub" id="pack-status">未読み込み。V4・V6は非公開パックの読み込みが必要です。</p>
+<div class="row"><button id="pick-batches">実レースの同期バッチを読み込む</button><input type="file" id="batch-files" accept=".json,application/json" multiple hidden></div><p class="sub" id="batch-status">実データ使用時は非公開GitHubの data/direct/sync 日別バッチ（JSON、複数選択）を指定してください。A/B・公式払戻照合・締切前取得が揃ったレースだけを開催日順で学習と評価に分割します。ファイルは端末内のみで処理します。</p>
 <div class="grid"><label>学習レース数<select id="train"><option value="1000">1,000（試運転）</option><option value="10000" selected>10,000</option><option value="100000">100,000</option><option value="1000000">1,000,000（PC長時間）</option></select></label><label>評価レース数<select id="evaluate"><option value="500">500</option><option value="2000" selected>2,000</option><option value="10000">10,000</option><option value="100000">100,000</option></select></label><label>再現用シード<input id="seed" value="20261121" maxlength="80"></label></div>
 <p class="sub">1エピソード48R／初期仮想資金10万円／借入・生活費なし／3連単のみ。学習報酬は収支から含み下落の拡大分に0.25を掛けたペナルティを差し引きます。</p>
 <div class="row"><button id="start" class="primary">学習を開始</button><button id="stop" disabled>停止</button><button id="load">結果JSONを読み込む</button><input type="file" id="file" accept=".json,application/json" hidden></div>
@@ -24,7 +27,7 @@
 <div class="grid"><div class="metric"><span>学習完了</span><strong id="train-progress">0 R</strong></div><div class="metric"><span>評価完了</span><strong id="eval-progress">0 R</strong></div><div class="metric"><span>学習済み状態</span><strong id="states">0</strong></div></div>
 </section>
 <section class="panel hidden" id="results">
-<h2>未使用の架空レースでの評価</h2>
+<h2>未使用レースでの評価</h2>
 <p class="sub" id="metadata"></p>
 <div class="tablewrap"><table><thead><tr><th>戦略</th><th>参加率</th><th>仮想収支</th><th>回収率</th><th>最大DD</th><th>平均収支/48R*</th><th>赤字エピソード率</th></tr></thead><tbody id="result-body"></tbody></table></div>
 <p class="sub">* 最終エピソードは48R未満の場合があります。回収率は購入0円なら算出不可。同じ評価レースを全戦略に使用し、評価中はQ値を更新しません。</p>
@@ -32,24 +35,30 @@
 <p class="sub" id="train-summary"></p>
 <button id="export" class="primary">学習結果・Q表をJSON出力</button>
 </section>
-<section class="panel"><h2>学習の意味</h2><p>予測モデル EXP-PL-0.1 を固定し、仮想残高、最大ドローダウン、予測確率、合成オッズ、残りレース数を使って状態を分類。見送りと5種類の仮想購入方法から選びます。</p><p class="sub">Q学習は合成環境の特性を学ぶため、別のシードでの架空評価が良くても現実への有効性は証明されません。評価用シードを繰り返し選び直して比較すると評価にも過適合します。</p></section>
+<section class="panel"><h2>学習の意味</h2><p>選択した予測モデルを固定し、仮想残高、最大ドローダウン、予測確率、オッズ、残りレース数を使って状態を分類。見送りと5種類の仮想購入方法から選びます。</p><p class="sub">同じシード・設定（実データの場合は同じバッチ）なら同一のレースでモデルを比較できます。架空レースは参考のみです。V6統合型は他のモデルより計算量が多いためPC推奨です。</p></section>
 </main>
+<script src="model-bridge.js"></script>
 <script>
 'use strict';
-const $=id=>document.getElementById(id),fmt=n=>Math.round(n).toLocaleString('ja-JP'),pct=v=>v==null?'—':(v*100).toFixed(1)+'%';let worker=null,report=null;
+const $=id=>document.getElementById(id),fmt=n=>Math.round(n).toLocaleString('ja-JP'),pct=v=>v==null?'—':(v*100).toFixed(1)+'%';let worker=null,report=null,pack=null,batches=null;
 function status(text,err=false){$('status').textContent=text;$('status').classList.toggle('bad',err)}
-function running(v){$('start').disabled=v;$('stop').disabled=!v;$('load').disabled=v;for(let x of ['train','evaluate','seed'])$(x).disabled=v}
+function running(v){$('start').disabled=v;$('stop').disabled=!v;$('load').disabled=v;for(let x of ['train','evaluate','seed','model','dataset','pick-pack','pick-batches'])$(x).disabled=v; if(!v&&$('dataset').value==='real'){$('train').disabled=true;$('evaluate').disabled=true}}
 function update(p){$('train-progress').textContent=fmt(p.train)+' / '+fmt(p.trainTotal)+' R';$('eval-progress').textContent=fmt(p.evaluate)+' / '+fmt(p.evalTotal)+' R';$('states').textContent=fmt(p.states);$('progress').style.width=100*(p.train+p.evaluate)/(p.trainTotal+p.evalTotal)+'%'}
 function stop(err){if(worker)worker.terminate();worker=null;running(false);if(err)status(err,true)}
-function valid(r){return r?.schema==='boat-q-lab-report-v1'&&r.syntheticOnly===true&&typeof r.version==='string'&&typeof r.engine==='string'&&typeof r.model==='string'&&typeof r.config?.seed==='string'&&[r.config.train,r.config.evaluate,r.states].every(Number.isFinite)&&Array.isArray(r.evaluation)&&r.evaluation.length===4&&r.evaluation.every(x=>typeof x.label==='string'&&[x.participation,x.pnl,x.maxDrawdown,x.averageEpisodePnL,x.lossEpisodes,x.episodes].every(Number.isFinite)&&(x.roi===null||Number.isFinite(x.roi)))&&Array.isArray(r.curve)&&r.curve.length<=1000&&r.curve.every(x=>Number.isFinite(x.rewardPerRace))&&Number.isFinite(r.training?.pnl)&&r.q&&typeof r.q==='object'}
+function valid(r){return r?.schema==='boat-q-lab-report-v1'&&typeof r.syntheticOnly==='boolean'&&typeof r.version==='string'&&typeof r.engine==='string'&&typeof r.model==='string'&&typeof r.config?.seed==='string'&&[r.config.train,r.config.evaluate,r.states].every(Number.isFinite)&&Array.isArray(r.evaluation)&&r.evaluation.length===4&&r.evaluation.every(x=>typeof x.label==='string'&&[x.participation,x.pnl,x.maxDrawdown,x.averageEpisodePnL,x.lossEpisodes,x.episodes].every(Number.isFinite)&&(x.roi===null||Number.isFinite(x.roi)))&&Array.isArray(r.curve)&&r.curve.length<=1000&&r.curve.every(x=>Number.isFinite(x.rewardPerRace))&&Number.isFinite(r.training?.pnl)&&r.q&&typeof r.q==='object'}
 function render(r){
   if(!valid(r))throw Error('対応する研究結果ではありません');
-  report=r;$('results').classList.remove('hidden');$('metadata').textContent=r.version+' / '+r.engine+' / '+r.model+' / seed: '+r.config.seed+' / 評価 '+fmt(r.config.evaluate)+'R';
+  report=r;$('results').classList.remove('hidden');$('metadata').textContent=(r.syntheticOnly?'架空（参考）':'実データ・事後検証')+' / '+r.version+' / '+r.engine+' / '+r.model+' / seed: '+r.config.seed+' / 評価 '+fmt(r.config.evaluate)+'R'+(r.data?' / 学習最終 '+r.data.trainEnd+' / 評価開始 '+r.data.evalStart:'');
   $('result-body').replaceChildren();for(const m of r.evaluation){const tr=document.createElement('tr');for(const val of [m.label,pct(m.participation),fmt(m.pnl)+'円',pct(m.roi),fmt(m.maxDrawdown)+'円',fmt(m.averageEpisodePnL)+'円',pct(m.lossEpisodes/m.episodes)]){const td=document.createElement('td');td.textContent=val;tr.append(td)}$('result-body').append(tr)}
   const c=$('chart'),g=c.getContext('2d'),a=r.curve.map(x=>x.rewardPerRace),min=Math.min(0,...a),max=Math.max(0,...a),span=max-min||1,y=v=>195-(v-min)/span*164;g.clearRect(0,0,c.width,c.height);g.fillStyle='#0b1d2a';g.fillRect(0,0,c.width,c.height);g.strokeStyle='#577689';g.beginPath();g.moveTo(55,y(0));g.lineTo(680,y(0));g.stroke();g.fillStyle='#a2bbc9';g.font='12px system-ui';g.fillText('報酬',8,16);g.fillText(max.toFixed(2),8,32);g.fillText(min.toFixed(2),8,200);g.fillText('1',55,217);g.fillText(fmt(r.config.train)+'R',610,217);g.strokeStyle='#42d9bd';g.lineWidth=2;g.beginPath();a.forEach((v,i)=>{const x=55+625*i/Math.max(1,a.length-1);i?g.lineTo(x,y(v)):g.moveTo(x,y(v))});g.stroke();
   $('train-summary').textContent='学習期間（探索含む）の仮想収支：'+fmt(r.training.pnl)+'円。学習状態数：'+fmt(r.states)+'。評価とは別集計です。';
 }
-$('start').onclick=()=>{try{const cfg={train:Number($('train').value),evaluate:Number($('evaluate').value),seed:$('seed').value};if(!cfg.seed.trim())throw Error('シードを入力してください');report=null;$('results').classList.add('hidden');running(true);status('学習中… ブラウザを開いたままにしてください');update({train:0,evaluate:0,trainTotal:cfg.train,evalTotal:cfg.evaluate,states:0});worker=new Worker('lab-worker.js');worker.onmessage=e=>{const d=e.data;if(d.type==='progress'){update(d.progress);status(d.progress.phase==='train'?'架空レースで学習中…':'未使用の架空レースで評価中…')}else if(d.type==='result'){stop();try{render(d.report);status('学習・評価完了')}catch(err){status(err.message,true)}}else if(d.type==='error')stop(d.message)};worker.onerror=()=>stop('学習処理を開始できませんでした。GitHub Pagesで開くかPCのNode.js版を使用してください。');worker.postMessage({type:'start',config:cfg})}catch(err){stop(err.message)}};
+$('pick-pack').onclick=()=>$('model-file').click();
+$('model-file').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>1000000)throw Error('モデルパックが大きすぎます');const p=JSON.parse(await f.text());await ModelBridge.browserSource(p);pack=p;$('pack-status').textContent='SHA-256確認済み：V58固定モデル3種を使用できます。';status('モデルパックの読み込み完了');}catch(err){pack=null;$('pack-status').textContent='未読み込み';status(err.message,true)}finally{e.target.value=''}};
+$('pick-batches').onclick=()=>$('batch-files').click();
+$('batch-files').onchange=async e=>{try{const fs=Array.from(e.target.files);if(!fs.length)return;if(fs.reduce((s,f)=>s+f.size,0)>100000000)throw Error('合計100MB以下のバッチを指定してください');batches=await Promise.all(fs.map(async f=>JSON.parse(await f.text())));$('batch-status').textContent=batches.length+'ファイル読み込み済み。開始時に照合・分割します。';}catch(err){batches=null;status(err.message,true)}finally{e.target.value=''}};
+$('dataset').onchange=()=>running(false);
+$('start').onclick=()=>{try{const cfg={train:Number($('train').value),evaluate:Number($('evaluate').value),seed:$('seed').value,model:$('model').value},real=$('dataset').value==='real';if(!cfg.seed.trim())throw Error('シードを入力してください');if(cfg.model!=='experimental'&&!pack)throw Error('非公開モデルパックを読み込んでください');if(real&&!batches)throw Error('実レースの同期バッチを読み込んでください');report=null;$('results').classList.add('hidden');running(true);status('学習中… ブラウザを開いたままにしてください');update({train:0,evaluate:0,trainTotal:cfg.train,evalTotal:cfg.evaluate,states:0});worker=new Worker('lab-worker.js');worker.onmessage=e=>{const d=e.data;if(d.type==='progress'){update(d.progress);status(d.progress.phase==='train'?'学習中…':'未使用レースで評価中…')}else if(d.type==='result'){stop();try{render(d.report);status('学習・評価完了')}catch(err){status(err.message,true)}}else if(d.type==='error')stop(d.message)};worker.onerror=()=>stop('学習処理を開始できませんでした。GitHub Pagesで開くかPCのNode.js版を使用してください。');worker.postMessage({type:'start',config:cfg,pack,batches:real?batches:null})}catch(err){stop(err.message)}};
 $('stop').onclick=()=>{stop();status('停止しました。未完了の結果は保存されません。')};
 $('export').onclick=()=>{if(!report)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));a.download='boat-q-report.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 $('load').onclick=()=>$('file').click();$('file').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>1000000)throw Error('結果ファイルが大きすぎます');const r=JSON.parse(await f.text());render(r);status('保存済み結果を表示しています');update({train:r.config.train,evaluate:r.config.evaluate,trainTotal:r.config.train,evalTotal:r.config.evaluate,states:r.states})}catch(err){status(err.message,true)}finally{e.target.value=''}};
